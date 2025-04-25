@@ -59,6 +59,7 @@ services:
       - .env
     entrypoint: ["/bin/bash", "-c", "tail -f /dev/null"]
     volumes:
+      - ./scripts:/app/spark-scripts
       - ./spark/conf/spark-defaults.conf:/opt/bitnami/spark/conf/spark-defaults.conf
     networks:
       - lakehouse
