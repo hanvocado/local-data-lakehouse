@@ -14,11 +14,8 @@ spark = (
 
 print("Spark Running")
 
-for item in spark.sparkContext.getConf().getAll():
-    print(item)
+spark.sql("CREATE TABLE nessie.names (name STRING) USING iceberg;").show()
 
-# spark.sql("CREATE TABLE nessie.names (name STRING) USING iceberg;").show()
+spark.sql("INSERT INTO nessie.names VALUES ('Alex Merced'), ('Dipankar Mazumdar'), ('Han Nguyen')").show()
 
-# spark.sql("INSERT INTO nessie.names VALUES ('Alex Merced'), ('Dipankar Mazumdar'), ('Han Nguyen')").show()
-
-# spark.sql("SELECT * FROM nessie.names;").show()
+spark.sql("SELECT * FROM nessie.names;").show()
