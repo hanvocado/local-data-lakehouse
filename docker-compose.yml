@@ -9,7 +9,7 @@ services:
       - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
       - SPARK_SSL_ENABLED=no
     volumes:
-      - ./spark/conf:/usr/local/spark/conf
+      - ./spark/conf/spark-defaults.conf:/opt/bitnami/spark/conf/spark-defaults.conf
     env_file:
       - .env
     ports:
@@ -25,7 +25,7 @@ services:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark-master:7077
     volumes:
-      - ./spark/conf:/usr/local/spark/conf
+      - ./spark/conf/spark-defaults.conf:/opt/bitnami/spark/conf/spark-defaults.conf
     depends_on:
       - spark-master
     env_file:
@@ -40,11 +40,26 @@ services:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark-master:7077
     volumes:
-      - ./spark/conf:/usr/local/spark/conf
+      - ./spark/conf/spark-defaults.conf:/opt/bitnami/spark/conf/spark-defaults.conf
     env_file:
       - .env
     depends_on:
       - spark-master
+    networks:
+      - lakehouse
+    
+  spark-driver:
+    image: custom-spark:3.5
+    container_name: spark-driver
+    depends_on:
+      - spark-master
+    environment:
+      - SPARK_MODE=client
+    env_file:
+      - .env
+    entrypoint: ["/bin/bash", "-c", "tail -f /dev/null"]
+    volumes:
+      - ./spark/conf/spark-defaults.conf:/opt/bitnami/spark/conf/spark-defaults.conf
     networks:
       - lakehouse
 
@@ -68,24 +83,6 @@ services:
     container_name: nessie
     ports:
       - "19120:19120"
-    networks:
-      - lakehouse
-
-  notebook:
-    image: jupyter/pyspark-notebook
-    container_name: notebook
-    ports:
-      - "8888:8888"
-    volumes:
-      - ./notebooks:/home/jovyan/work/notebooks
-    environment:
-      - SPARK_MASTER=spark://spark-master:7077
-    env_file:
-      - .env
-    depends_on:
-      - spark-master
-      - nessie
-      - minio
     networks:
       - lakehouse
 
