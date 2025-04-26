@@ -1,4 +1,4 @@
-FROM bitnami/spark:3.5
+FROM bitnami/spark:3.3
 
 ENV SPARK_HOME=/opt/bitnami/spark
 
