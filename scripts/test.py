@@ -14,8 +14,8 @@ spark = (
 
 print("Spark Running")
 
-spark.sql("CREATE TABLE nessie.names (name STRING) USING iceberg;").show()
+spark.sql("CREATE TABLE nessie.names (name STRING) USING iceberg;")
 
-spark.sql("INSERT INTO nessie.names VALUES ('Alex Merced'), ('Dipankar Mazumdar'), ('Han Nguyen')").show()
+spark.sql("INSERT INTO nessie.names VALUES ('Alex Merced'), ('Dipankar Mazumdar'), ('Han Nguyen')")
 
 spark.sql("SELECT * FROM nessie.names;").show()
