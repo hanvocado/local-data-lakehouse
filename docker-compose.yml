@@ -1,68 +1,45 @@
 services:
   spark-master:
-    image: custom-spark:3.3
+    image: custom-spark:3.2
     container_name: spark-master
     environment:
       - SPARK_MODE=master
-      - SPARK_RPC_AUTHENTICATION_ENABLED=no
-      - SPARK_RPC_ENCRYPTION_ENABLED=no
-      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
-      - SPARK_SSL_ENABLED=no
-    volumes:
-      - ./spark/conf/spark-defaults.conf:/opt/bitnami/spark/conf/spark-defaults.conf
+      - SPARK_DRIVER_MEMORY=4g
+      - SPARK_EXECUTOR_MEMORY=4g
     env_file:
-      - .env
+      - ./spark/.env
     ports:
-      - "7077:7077"  # Spark Master
-      - "8080:8080"  # Spark UI
-    networks:
-      - lakehouse
+      - "7077:7077"
+      - "8080:8080"
+    volumes:
+      - ./scripts:/opt/work/spark-scripts
+      - ./spark/conf/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
 
   spark-worker-1:
-    image: custom-spark:3.3
+    image: custom-spark:3.2
     container_name: spark-worker-1
     environment:
       - SPARK_MODE=worker
-      - SPARK_MASTER_URL=spark://spark-master:7077
-    volumes:
-      - ./spark/conf/spark-defaults.conf:/opt/bitnami/spark/conf/spark-defaults.conf
+      - SPARK_MASTER=spark://spark-master:7077
+    env_file:
+      - ./spark/.env
     depends_on:
       - spark-master
-    env_file:
-      - .env
-    networks:
-      - lakehouse
+    volumes:
+      - ./spark/conf/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
 
   spark-worker-2:
-    image: custom-spark:3.3
+    image: custom-spark:3.2
     container_name: spark-worker-2
     environment:
       - SPARK_MODE=worker
-      - SPARK_MASTER_URL=spark://spark-master:7077
-    volumes:
-      - ./spark/conf/spark-defaults.conf:/opt/bitnami/spark/conf/spark-defaults.conf
+      - SPARK_MASTER=spark://spark-master:7077
     env_file:
-      - .env
+      - ./spark/.env
     depends_on:
       - spark-master
-    networks:
-      - lakehouse
-    
-  spark-driver:
-    image: custom-spark:3.3
-    container_name: spark-driver
-    depends_on:
-      - spark-master
-    environment:
-      - SPARK_MODE=client
-    env_file:
-      - .env
-    entrypoint: ["/bin/bash", "-c", "tail -f /dev/null"]
     volumes:
-      - ./scripts:/app/spark-scripts
-      - ./spark/conf/spark-defaults.conf:/opt/bitnami/spark/conf/spark-defaults.conf
-    networks:
-      - lakehouse
+      - ./spark/conf/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
 
   minio:
     image: minio/minio
@@ -76,20 +53,48 @@ services:
       - "9001:9001"
     volumes:
       - minio-data:/data
-    networks:
-      - lakehouse
 
-  nessie:
-    image: projectnessie/nessie:latest
-    container_name: nessie
+  postgres-metastore:
+    image: postgres:latest
+    container_name: postgres-metastore
+    environment:
+      POSTGRES_DB: metastore
+      POSTGRES_USER: hive
+      POSTGRES_PASSWORD: hive
     ports:
-      - "19120:19120"
-    networks:
-      - lakehouse
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hive"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  hive-metastore:
+    image: apache/hive:4.0.0
+    container_name: hive-metastore
+    depends_on:
+      postgres-metastore:
+        condition: service_healthy
+    environment:
+      - SERVICE_NAME=metastore
+      - HIVE_METASTORE_DB_TYPE=postgres
+      - HIVE_METASTORE_DB_HOST=postgres-metastore
+      - HIVE_METASTORE_DB_NAME=metastore
+      - HIVE_METASTORE_DB_USER=hive
+      - HIVE_METASTORE_DB_PASS=hive
+    env_file:
+      - ./hive/.env
+    volumes:
+    - ./hive/jars/aws-java-sdk-bundle-1.12.150.jar:/opt/hive/lib/aws-java-sdk-bundle-1.12.150.jar
+    - ./hive/jars/hadoop-aws-3.3.1.jar:/opt/hive/lib/hadoop-aws-3.3.1.jar
+    - ./hive/core-site.xml:/opt/hadoop/etc/hadoop/core-site.xml
+    ports:
+      - "9083:9083"
+    command: >
+      bash -c "
+        /opt/hive/bin/schematool -initSchema -dbType postgres --verbose &&
+        hive --service metastore
+      "
 
 volumes:
   minio-data:
-
-networks:
-  lakehouse:
-    driver: bridge
