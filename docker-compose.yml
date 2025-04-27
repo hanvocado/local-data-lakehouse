@@ -1,35 +1,41 @@
 services:
   spark-master:
-    image: custom-spark:3.3
+    image: custom-spark:3.2
     container_name: spark-master
     environment:
       - SPARK_MODE=master
       - SPARK_DRIVER_MEMORY=4g
       - SPARK_EXECUTOR_MEMORY=4g
+    env_file:
+      - ./spark/.env
     ports:
       - "7077:7077"
       - "8080:8080"
     volumes:
-      - ./scripts:/app/spark-scripts
+      - ./scripts:/opt/work/spark-scripts
       - ./spark/conf/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
 
   spark-worker-1:
-    image: custom-spark:3.3
+    image: custom-spark:3.2
     container_name: spark-worker-1
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER=spark://spark-master:7077
+    env_file:
+      - ./spark/.env
     depends_on:
       - spark-master
     volumes:
       - ./spark/conf/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
 
   spark-worker-2:
-    image: custom-spark:3.3
+    image: custom-spark:3.2
     container_name: spark-worker-2
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER=spark://spark-master:7077
+    env_file:
+      - ./spark/.env
     depends_on:
       - spark-master
     volumes:
@@ -48,11 +54,47 @@ services:
     volumes:
       - minio-data:/data
 
-  nessie:
-    image: projectnessie/nessie:latest
-    container_name: nessie
+  postgres-metastore:
+    image: postgres:latest
+    container_name: postgres-metastore
+    environment:
+      POSTGRES_DB: metastore
+      POSTGRES_USER: hive
+      POSTGRES_PASSWORD: hive
     ports:
-      - "19120:19120"
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hive"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  hive-metastore:
+    image: apache/hive:4.0.0
+    container_name: hive-metastore
+    depends_on:
+      postgres-metastore:
+        condition: service_healthy
+    environment:
+      - SERVICE_NAME=metastore
+      - HIVE_METASTORE_DB_TYPE=postgres
+      - HIVE_METASTORE_DB_HOST=postgres-metastore
+      - HIVE_METASTORE_DB_NAME=metastore
+      - HIVE_METASTORE_DB_USER=hive
+      - HIVE_METASTORE_DB_PASS=hive
+    env_file:
+      - ./hive/.env
+    volumes:
+    - ./hive/jars/aws-java-sdk-bundle-1.12.150.jar:/opt/hive/lib/aws-java-sdk-bundle-1.12.150.jar
+    - ./hive/jars/hadoop-aws-3.3.1.jar:/opt/hive/lib/hadoop-aws-3.3.1.jar
+    - ./hive/core-site.xml:/opt/hadoop/etc/hadoop/core-site.xml
+    ports:
+      - "9083:9083"
+    command: >
+      bash -c "
+        /opt/hive/bin/schematool -initSchema -dbType postgres --verbose &&
+        hive --service metastore
+      "
 
 volumes:
   minio-data:
