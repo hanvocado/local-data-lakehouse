@@ -9,13 +9,9 @@ AWS_SECRET_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
 
 spark = (
     SparkSession.builder
-    .appName("lakehouse-test")
+    .appName("upload-test")
     .config("spark.hadoop.fs.s3a.access.key", AWS_ACCESS_KEY)
-    .config("spark.hadoop.fs.s3a.secret.key", AWS_SECRET_KEY)
-    .config("spark.executor.memory", "4g") 
-    .config("spark.executor.cores", "2") 
-    .config("spark.driver.memory", "4g")  
-    .config("spark.driver.cores", "2")  
+    .config("spark.hadoop.fs.s3a.secret.key", AWS_SECRET_KEY) 
     .getOrCreate()
 )
 

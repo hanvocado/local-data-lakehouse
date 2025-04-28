@@ -4,8 +4,6 @@ services:
     container_name: spark-master
     environment:
       - SPARK_MODE=master
-      - SPARK_DRIVER_MEMORY=4g
-      - SPARK_EXECUTOR_MEMORY=4g
     env_file:
       - ./spark/.env
     ports:
@@ -14,10 +12,14 @@ services:
     volumes:
       - ./scripts:/opt/work/spark-scripts
       - ./spark/conf/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 0.5G
 
-  spark-worker-1:
+  spark-worker:
     image: hanvocado/custom-spark:3.2
-    container_name: spark-worker-1
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER=spark://spark-master:7077
@@ -27,19 +29,14 @@ services:
       - spark-master
     volumes:
       - ./spark/conf/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
-
-  spark-worker-2:
-    image: hanvocado/custom-spark:3.2
-    container_name: spark-worker-2
-    environment:
-      - SPARK_MODE=worker
-      - SPARK_MASTER=spark://spark-master:7077
-    env_file:
-      - ./spark/.env
-    depends_on:
-      - spark-master
-    volumes:
-      - ./spark/conf/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+        reservations:
+          cpus: '1.0'
+          memory: 0.5G
 
   minio:
     image: minio/minio
@@ -61,6 +58,8 @@ services:
       POSTGRES_DB: metastore
       POSTGRES_USER: hive
       POSTGRES_PASSWORD: hive
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
@@ -70,7 +69,7 @@ services:
       retries: 5
 
   hive-metastore:
-    image: apache/hive:4.0.0
+    image: hanvocado/hive-metastore:4.0
     container_name: hive-metastore
     depends_on:
       postgres-metastore:
@@ -84,10 +83,6 @@ services:
       - HIVE_METASTORE_DB_PASS=hive
     env_file:
       - ./hive/.env
-    volumes:
-    - ./hive/jars/aws-java-sdk-bundle-1.12.150.jar:/opt/hive/lib/aws-java-sdk-bundle-1.12.150.jar
-    - ./hive/jars/hadoop-aws-3.3.1.jar:/opt/hive/lib/hadoop-aws-3.3.1.jar
-    - ./hive/core-site.xml:/opt/hadoop/etc/hadoop/core-site.xml
     ports:
       - "9083:9083"
     command: >
@@ -107,3 +102,4 @@ services:
 
 volumes:
   minio-data:
+  postgres-data:
